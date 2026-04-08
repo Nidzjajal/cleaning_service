@@ -1,5 +1,7 @@
 // Forces providers with isFirstLogin=true to reset password before proceeding
+// DISABLED per user request: Everyone now goes straight to dashboard
 const firstLoginGuard = (req, res, next) => {
+  /*
   if (!req.user) return next();
 
   if (
@@ -15,6 +17,7 @@ const firstLoginGuard = (req, res, next) => {
       redirectTo: '/reset-password',
     });
   }
+  */
 
   next();
 };

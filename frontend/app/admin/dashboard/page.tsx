@@ -57,6 +57,13 @@ export default function AdminDashboard() {
   useEffect(() => { fetchAll() }, [])
 
   const fetchAll = async () => {
+    // Prevent request if no token exists to avoid 401 noise
+    if (typeof window !== 'undefined' && !localStorage.getItem('hl_token')) {
+      console.warn('No token found, redirecting to login...');
+      router.push('/login?error=session_required');
+      return;
+    }
+
     setLoadingStats(true)
     setError(null)
     console.log('Fetching Admin Dashboard Data...')
@@ -86,6 +93,9 @@ export default function AdminDashboard() {
       console.error('FAILED TO FETCH DASHBOARD:', err)
       if (err.response?.status === 401) {
          setError('Your session has expired. Redirecting to login...')
+         setTimeout(() => {
+           router.push('/login?error=session_expired');
+         }, 2000);
          return; 
       }
       const msg = err.response?.data?.message || err.message || 'Failed to connect to server'

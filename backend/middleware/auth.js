@@ -13,6 +13,7 @@ const protect = async (req, res, next) => {
     }
 
     if (!token) {
+      console.warn('⚠️ Auth failed: No token provided in headers');
       return res
         .status(401)
         .json({ success: false, message: 'Not authorized, no token' });
@@ -22,12 +23,14 @@ const protect = async (req, res, next) => {
     const user = await User.findById(decoded.id).select('-passwordHash');
 
     if (!user) {
+      console.warn(`⚠️ Auth failed: User with ID ${decoded.id} not found in database`);
       return res
         .status(401)
         .json({ success: false, message: 'User not found' });
     }
 
     if (!user.isActive) {
+      console.warn(`⚠️ Auth failed: User ${user.email} is deactivated`);
       return res
         .status(401)
         .json({ success: false, message: 'Account is deactivated' });
@@ -37,15 +40,18 @@ const protect = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
+      console.error('❌ Auth failed: Invalid JWT token');
       return res
         .status(401)
         .json({ success: false, message: 'Invalid token' });
     }
     if (error.name === 'TokenExpiredError') {
+      console.warn('⚠️ Auth failed: JWT token expired');
       return res
         .status(401)
         .json({ success: false, message: 'Token expired, please login again' });
     }
+    console.error('❌ Auth Error:', error.message);
     next(error);
   }
 };

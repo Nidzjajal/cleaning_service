@@ -1,4 +1,5 @@
 require('dotenv').config();
+const mongoose = require('mongoose');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -17,17 +18,21 @@ const bookingRoutes = require('./routes/bookings');
 const adminRoutes = require('./routes/admin');
 const serviceRoutes = require('./routes/services');
 const providerRoutes = require('./routes/providers');
-
-// Connect to MongoDB
-connectDB();
+const paymentRoutes = require('./routes/payment');
 
 const app = express();
 const httpServer = http.createServer(app);
 
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+].filter(Boolean);
+
 // Socket.io setup
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -49,7 +54,7 @@ initAutoAssignService(app);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true,
   })
 );
@@ -63,8 +68,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-const paymentRoutes = require('./routes/payment');
 
 // ===== API ROUTES =====
 app.use('/api/auth', authRoutes);
@@ -81,6 +84,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     service: 'HelpLender API',
     version: '1.0.0',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
@@ -92,16 +96,28 @@ app.use((req, res) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => {
-  console.log(`
-🚀 HelpLender Server Running!
+// Connect to MongoDB then start server
+const startServer = async () => {
+  try {
+    await connectDB();
+    
+    const PORT = process.env.PORT || 5000;
+    httpServer.listen(PORT, () => {
+      console.log(`
+🚀 HelpLender Server Ready!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📡 API:    http://localhost:${PORT}/api
 🔌 Socket: ws://localhost:${PORT}
 🌍 Env:    ${process.env.NODE_ENV}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  `);
-});
+      `);
+    });
+  } catch (error) {
+    console.error('🛑 Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;

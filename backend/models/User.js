@@ -41,9 +41,7 @@ const userSchema = new mongoose.Schema(
     },
     isFirstLogin: {
       type: Boolean,
-      default: function () {
-        return this.role === 'provider';
-      },
+      default: false,
     },
     isActive: {
       type: Boolean,

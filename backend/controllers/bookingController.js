@@ -11,6 +11,7 @@ const {
   sendJobCompletedSms,
 } = require('../services/twilioService');
 const { createCheckoutSession } = require('../services/stripeService');
+const { sendBookingConfiramtionEmail } = require('../services/emailService');
 const mongoose = require('mongoose');
 
 // @desc  Create a new booking
@@ -124,7 +125,13 @@ const createBooking = async (req, res, next) => {
 
     await session.commitTransaction();
 
-    // 7. If COD, broadcast to all providers (since it's unpaid online, it's alive now)
+    // 7. Send Dynamic Emails to the customer's email ID
+    sendBookingConfiramtionEmail(req.user, {
+       ...booking.toObject(),
+       serviceId: service
+    }).catch(err => console.error('Email failed:', err));
+
+    // 8. If COD, broadcast to all providers (since it's unpaid online, it's alive now)
     // If CARD, we broadcast ONLY after webhook confirms payment
     if (paymentMethod === 'COD') {
       const io = req.app.get('io');

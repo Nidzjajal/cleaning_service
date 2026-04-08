@@ -1,16 +1,31 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 import { Eye, EyeOff, Loader2, Mail, Lock, User, Phone } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function SignupPage() {
+  const { isAuthenticated } = useAuth()
   const router = useRouter()
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' })
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated) {
+      const userStr = localStorage.getItem('hl_user')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        if (user.role === 'admin') router.push('/admin/dashboard')
+        else if (user.role === 'provider') router.push('/provider/dashboard')
+        else router.push('/customer/dashboard')
+      }
+    }
+  }, [isAuthenticated, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

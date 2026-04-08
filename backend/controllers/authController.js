@@ -52,15 +52,7 @@ const login = async (req, res, next) => {
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      // Also check temp password for provider first login
-      if (user.role === 'provider' && user.isFirstLogin) {
-        const tempUser = await User.findOne({ email }).select('+tempPassword');
-        if (tempUser.tempPassword !== password) {
-          return res.status(401).json({ success: false, message: 'Invalid credentials' });
-        }
-      } else {
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
-      }
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     if (!user.isActive) {
@@ -74,7 +66,6 @@ const login = async (req, res, next) => {
       success: true,
       token,
       user: profile,
-      requiresPasswordReset: user.isFirstLogin && user.role === 'provider',
     });
   } catch (error) {
     next(error);
@@ -155,7 +146,7 @@ const becomeHelper = async (req, res, next) => {
       passwordHash: password,
       role: 'provider',
       status: 'PENDING',
-      isFirstLogin: true,
+      isFirstLogin: false,
       address,
       idDocumentUrl: req.file ? `/uploads/${req.file.filename}` : null,
     });
