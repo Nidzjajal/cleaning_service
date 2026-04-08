@@ -236,8 +236,9 @@ export default function CustomerDashboard() {
                             </>
                           ) : (
                             <div className="flex flex-col px-4">
-                              <p className="text-[10px] font-black text-dark/40 uppercase tracking-widest animate-pulse">Assigning Expert...</p>
-                              <div className="w-full h-1 bg-dark/5 rounded-full mt-2 overflow-hidden">
+                              <p className="text-[10px] font-black text-dark/40 uppercase tracking-[0.2em] animate-pulse mb-1">Provider is checking your request...</p>
+                              <p className="text-[9px] font-bold text-accent uppercase tracking-widest">Awaiting expert confirmation</p>
+                              <div className="w-full h-1 bg-dark/5 rounded-full mt-3 overflow-hidden">
                                  <div className="h-full bg-accent w-1/2 animate-shimmer"></div>
                               </div>
                             </div>
@@ -254,9 +255,16 @@ export default function CustomerDashboard() {
                               <Navigation className="w-3 h-3" /> Live Control
                             </Link>
                           ) : (
-                            <Link href={`/customer/bookings/${booking._id}`} className="btn-ghost btn-sm py-3 px-8 border border-dark/5 text-dark/40 hover:text-dark hover:bg-white uppercase font-black text-[10px] tracking-widest flex items-center gap-2">
-                              Full Report <ChevronRight className="w-3 h-3" />
-                            </Link>
+                            <div className="flex items-center gap-2">
+                              {booking.status === 'COMPLETED' && (
+                                <Link href={`/customer/bookings/${booking._id}/review`} className="btn-accent btn-sm py-3 px-6 shadow-glow-accent uppercase font-black text-[10px] tracking-widest flex items-center gap-2">
+                                  <Star className="w-3 h-3 fill-current" /> Rate Service
+                                </Link>
+                              )}
+                              <Link href={`/customer/bookings/${booking._id}`} className="btn-ghost btn-sm py-3 px-8 border border-dark/5 text-dark/40 hover:text-dark hover:bg-white uppercase font-black text-[10px] tracking-widest flex items-center gap-2">
+                                Full Report <ChevronRight className="w-3 h-3" />
+                              </Link>
+                            </div>
                           )}
                         </div>
                       </div>

@@ -35,7 +35,7 @@ router.get('/jobs/new', protect, authorize('provider'), async (req, res, next) =
       providerId: null,
     })
       .populate('serviceId', 'name icon basePrice')
-      .populate('customerId', 'name')
+      .populate('customerId', 'name phone address')
       .sort({ scheduledDate: 1 })
       .limit(20);
 

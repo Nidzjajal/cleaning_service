@@ -139,6 +139,7 @@ const createBooking = async (req, res, next) => {
         io.emit('new-job-request', {
           bookingId: booking._id,
           serviceName: service.name,
+          customerName: req.user.name,
           scheduledDate: booking.scheduledDate,
           scheduledTime: booking.scheduledTime,
           price: pricing.providerEarning,
@@ -158,16 +159,18 @@ const createBooking = async (req, res, next) => {
     if (session.inTransaction()) {
       await session.abortTransaction();
     }
-    console.error('[BOOKING_ERROR]', error);
-    // Bulletproof next() check
-    if (typeof next === 'function') {
-      return next(error);
+    const fs = require('fs');
+    fs.writeFileSync('booking_error_debug.log', error.stack || error.toString());
+    console.error('[BOOKING_ERROR_CRITICAL]', error);
+    
+    // Provide actual error feedback to frontend
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Booking creation failed internally',
+        error: error.toString()
+      });
     }
-    // Fallback for weird Express behavior
-    return res.status(500).json({ 
-      success: false, 
-      message: error.message || 'next is not a function' 
-    });
   } finally {
     await session.endSession();
   }
@@ -400,6 +403,30 @@ const acceptBooking = async (req, res, next) => {
   }
 };
 
+// @desc  Reject a pending booking (provider action - hide from their dashboard)
+// @route POST /api/bookings/:id/reject
+// @access Private (provider)
+const rejectBooking = async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.status !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'Job is already assigned or cancelled' });
+    }
+
+    // In a full implementation, you'd add this provider to a "rejectedBy" list on the booking
+    // For now, we'll just log it and return success so the frontend can hide it.
+    console.log(`[REJECT] Provider ${req.user.name} rejected booking ${booking._id}`);
+
+    res.json({ success: true, message: 'Job rejected successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -407,4 +434,5 @@ module.exports = {
   getAvailableProviders,
   updateBookingStatus,
   acceptBooking,
+  rejectBooking,
 };

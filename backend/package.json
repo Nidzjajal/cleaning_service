@@ -5,6 +5,8 @@
     "main": "server.js",
     "scripts": {
         "seed": "node scripts/seed.js",
+        "db-check": "node scripts/db-check.js",
+        "db-stats": "node scripts/db-stats.js",
         "dev": "nodemon server.js",
         "start": "node server.js"
     },

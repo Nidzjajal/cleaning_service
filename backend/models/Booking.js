@@ -140,7 +140,7 @@ const bookingSchema = new mongoose.Schema(
 );
 
 // Pre-save: Generate booking reference
-bookingSchema.pre('save', function (next) {
+bookingSchema.pre('save', async function () {
   if (!this.bookingRef) {
     this.bookingRef =
       'HL' +
@@ -167,8 +167,6 @@ bookingSchema.pre('save', function (next) {
     );
     this.bufferEndTime = endTime;
   }
-
-  next();
 });
 
 bookingSchema.index({

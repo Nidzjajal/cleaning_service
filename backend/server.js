@@ -19,6 +19,7 @@ const adminRoutes = require('./routes/admin');
 const serviceRoutes = require('./routes/services');
 const providerRoutes = require('./routes/providers');
 const paymentRoutes = require('./routes/payment');
+const reviewRoutes = require('./routes/reviews');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -117,6 +118,14 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+// Global error catchers
+process.on('unhandledRejection', (err) => {
+  console.error('[FATAL] Unhandled Rejection:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err);
+});
 
 startServer();
 

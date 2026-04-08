@@ -72,12 +72,26 @@ export default function ProviderDashboard() {
   const fetchDashboard = async () => {
     setLoading(true)
     try {
-      const [jobsRes, meRes] = await Promise.all([
+      const [jobsRes, newJobsRes, meRes] = await Promise.all([
         api.get('/providers/jobs').catch(() => ({ data: { jobs: [] } })),
+        api.get('/providers/jobs/new').catch(() => ({ data: { jobs: [] } })),
         api.get('/auth/me'),
       ])
+      
       setProfile(meRes.data.user)
-      setJobs(jobsRes.data.jobs || [])
+      
+      const assignedJobs = jobsRes.data.jobs || []
+      const unclaimedJobs = newJobsRes.data.jobs || []
+      
+      // Combine and remove duplicates (though they should be distinct by providerId filter)
+      const combinedJobs = [...assignedJobs]
+      unclaimedJobs.forEach((nj: any) => {
+        if (!combinedJobs.find(aj => aj._id === nj._id)) {
+          combinedJobs.push(nj)
+        }
+      })
+
+      setJobs(combinedJobs)
     } catch (err: any) {
       toast.error('Failed to load dashboard')
     } finally {
@@ -106,11 +120,35 @@ export default function ProviderDashboard() {
   const handleReject = async (booking: Booking) => {
     setActionLoading(booking._id + '-reject')
     try {
-      await api.put(`/bookings/${booking._id}/status`, { status: 'CANCELLED', note: 'Rejected by provider' })
+      await api.post(`/bookings/${booking._id}/reject`)
       toast('Job rejected', { icon: '↩️' })
       fetchDashboard()
     } catch { toast.error('Failed to reject job') }
     finally { setActionLoading(null) }
+  }
+
+  const handleStatusUpdate = async (bookingId: string, status: string) => {
+    setActionLoading(bookingId + '-status')
+    try {
+      // Use socket for real-time status update or API
+      await api.put(`/bookings/${bookingId}/status`, { status })
+      
+      // If going ON_THE_WAY, start geolocation tracking
+      if (status === 'ON_THE_WAY') {
+        startTracking()
+        setActiveJob(jobs.find(j => j._id === bookingId) || null)
+      } else if (status === 'COMPLETED') {
+        stopTracking()
+        setActiveJob(null)
+      }
+      
+      toast.success(`Status updated to ${status.replace('_', ' ')}`)
+      fetchDashboard()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Update failed')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   const pendingJobs = jobs.filter(j => j.status === 'PENDING')
@@ -194,14 +232,14 @@ export default function ProviderDashboard() {
            </div>
 
            {/* Small Stats Cards */}
-           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col justify-between">
+           <Link href="/provider/reviews" className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col justify-between hover:border-accent transition-all group/rating">
               <div>
-                 <div className="p-2 bg-blue-50 rounded-xl text-blue-600 inline-block mb-4"><Star size={20} /></div>
+                 <div className="p-2 bg-blue-50 rounded-xl text-blue-600 inline-block mb-4 group-hover/rating:bg-accent group-hover/rating:text-white transition-all"><Star size={20} /></div>
                  <h4 className="text-[10px] uppercase font-bold text-dark/30 tracking-widest mb-1">Service Rating</h4>
                  <div className="font-display text-3xl font-bold text-dark">{profile?.providerProfile?.rating || '4.8'}</div>
               </div>
-              <div className="text-[11px] text-blue-600 font-bold bg-blue-50 px-3 py-1.5 rounded-lg text-center mt-4">Top 5% in Mumbai</div>
-           </div>
+              <div className="text-[11px] text-blue-600 font-bold bg-blue-50 px-3 py-1.5 rounded-lg text-center mt-4 group-hover/rating:bg-accent/10 group-hover/rating:text-accent transition-all">View All Reviews</div>
+           </Link>
 
            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col justify-between group overflow-hidden relative">
               <div className="absolute -bottom-6 -right-6 text-accent/5 group-hover:scale-110 transition-transform"><Package size={80} /></div>
@@ -254,12 +292,39 @@ export default function ProviderDashboard() {
                                 </p>
                              </div>
                              <div className="flex gap-2">
-                                <Link href="#" className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold text-dark/60 hover:bg-surface transition-all">
+                                <Link href={`/provider/bookings/${job._id}`} className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-dark/40 hover:bg-surface transition-all">
                                    Details
                                 </Link>
-                                <button className="px-7 py-2.5 bg-accent text-white rounded-xl text-xs font-bold shadow-lg shadow-accent/20 hover:bg-dark transition-all">
-                                  Track
-                                </button>
+                                
+                                {job.status === 'CONFIRMED' || job.status === 'PROVIDER_ASSIGNED' ? (
+                                  <button 
+                                    onClick={() => handleStatusUpdate(job._id, 'ON_THE_WAY')}
+                                    className="px-6 py-2.5 bg-accent text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-accent/20 hover:bg-dark transition-all flex items-center gap-2"
+                                  >
+                                    <Navigation className="w-3 h-3" /> Start Journey
+                                  </button>
+                                ) : job.status === 'ON_THE_WAY' ? (
+                                  <button 
+                                    onClick={() => handleStatusUpdate(job._id, 'ARRIVED')}
+                                    className="px-6 py-2.5 bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-600 transition-all flex items-center gap-2"
+                                  >
+                                    <MapPin className="w-3 h-3" /> I Have Arrived
+                                  </button>
+                                ) : job.status === 'ARRIVED' ? (
+                                  <button 
+                                    onClick={() => handleStatusUpdate(job._id, 'IN_PROGRESS')}
+                                    className="px-6 py-2.5 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-green-200 hover:bg-green-600 transition-all flex items-center gap-2"
+                                  >
+                                    <Zap className="w-3 h-3" /> Start Service
+                                  </button>
+                                ) : job.status === 'IN_PROGRESS' ? (
+                                  <button 
+                                    onClick={() => handleStatusUpdate(job._id, 'COMPLETED')}
+                                    className="px-6 py-2.5 bg-dark text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-dark/20 hover:bg-black transition-all flex items-center gap-2"
+                                  >
+                                    <CheckCircle className="w-3 h-3" /> Mark Complete
+                                  </button>
+                                ) : null}
                              </div>
                           </div>
                        ))}
@@ -282,9 +347,13 @@ export default function ProviderDashboard() {
                        {pendingJobs.map(job => (
                           <div key={job._id} className="flex flex-col md:flex-row md:items-center gap-4 bg-white p-6 rounded-2xl border border-amber-200/50 shadow-sm">
                              <div className="flex-1">
-                                <h4 className="font-bold text-dark mb-1">{(job.serviceId as any)?.name}</h4>
+                                <div className="flex items-center gap-3 mb-1">
+                                   <h4 className="font-bold text-dark italic">{(job.customerId as any)?.name || 'New Customer'}</h4>
+                                   <span className="text-[10px] bg-dark text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Incoming</span>
+                                </div>
+                                <h4 className="font-black text-xs text-dark/40 uppercase tracking-widest mb-2">{(job.serviceId as any)?.name}</h4>
                                 <div className="flex flex-wrap gap-4 text-xs text-dark/40 font-medium">
-                                   <span className="flex items-center gap-1.5"><Clock size={14} /> Today, {job.scheduledTime}</span>
+                                   <span className="flex items-center gap-1.5"><Clock size={14} /> {new Date(job.scheduledDate).toLocaleDateString()} at {job.scheduledTime}</span>
                                    <span className="flex items-center gap-1.5"><MapPin size={14} /> {job.serviceAddress?.city}</span>
                                 </div>
                              </div>
