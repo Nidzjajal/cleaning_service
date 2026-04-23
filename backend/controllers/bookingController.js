@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Service = require('../models/Service');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const Cancellation = require('../models/Cancellation');
 const { calculatePricing } = require('../services/commissionService');
 const { findAvailableProviders, isProviderAvailable } = require('../services/availabilityService');
 const {
@@ -427,6 +428,132 @@ const rejectBooking = async (req, res, next) => {
   }
 };
 
+// @desc  Cancel a booking
+// @route POST /api/bookings/:id/cancel
+// @access Private (customer)
+const cancelBooking = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const bookingId = req.params.id;
+    const { reason } = req.body;
+
+    const booking = await Booking.findById(bookingId).session(session);
+    if (!booking) {
+      await session.abortTransaction();
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.customerId.toString() !== req.user._id.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    // Usually can't cancel if already in progress or completed
+    if (['IN_PROGRESS', 'COMPLETED', 'REVIEWED', 'CANCELLED'].includes(booking.status)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: 'Cannot cancel booking at current stage' });
+    }
+
+    booking.status = 'CANCELLED';
+    booking.statusHistory.push({ status: 'CANCELLED', changedAt: new Date(), note: 'Cancelled by customer' });
+    await booking.save();
+
+    await Cancellation.create(
+      [{
+        bookingId: booking._id,
+        customerId: req.user._id,
+        type: 'CANCEL',
+        reason: reason || 'No reason provided',
+        status: 'PROCESSED'
+      }],
+      { session }
+    );
+
+    // If there's an associated transaction, update it to cancelled as well.
+    await Transaction.updateMany({ bookingId: booking._id }, { status: 'CANCELLED' }, { session });
+
+    await session.commitTransaction();
+    res.json({ success: true, message: 'Booking cancelled successfully', booking });
+  } catch (error) {
+    await session.abortTransaction();
+    next(error);
+  } finally {
+    session.endSession();
+  }
+};
+
+// @desc  Postpone a booking
+// @route POST /api/bookings/:id/postpone
+// @access Private (customer)
+const postponeBooking = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const bookingId = req.params.id;
+    const { reason, newDate, newTime } = req.body;
+
+    if (!newDate || !newTime) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: 'Please provide new date and time' });
+    }
+
+    const booking = await Booking.findById(bookingId).session(session);
+    if (!booking) {
+      await session.abortTransaction();
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.customerId.toString() !== req.user._id.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    // Usually can't postpone if already in progress or completed
+    if (['IN_PROGRESS', 'COMPLETED', 'REVIEWED', 'CANCELLED'].includes(booking.status)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: 'Cannot postpone booking at current stage' });
+    }
+
+    const originalDate = booking.scheduledDate;
+    const originalTime = booking.scheduledTime;
+
+    booking.scheduledDate = new Date(newDate);
+    booking.scheduledTime = newTime;
+    booking.statusHistory.push({ status: booking.status, changedAt: new Date(), note: `Postponed to ${newDate} ${newTime}` });
+    await booking.save();
+
+    await Cancellation.create(
+      [{
+        bookingId: booking._id,
+        customerId: req.user._id,
+        type: 'POSTPONE',
+        reason: reason || 'Postponement request',
+        details: {
+          originalDate,
+          originalTime,
+          newDate: new Date(newDate),
+          newTime
+        },
+        status: 'PROCESSED'
+      }],
+      { session }
+    );
+
+    // If it was already confirmed and we had an assigned provider, we might want to notify them or un-assign them. Let's just update the booking for now.
+    
+    await session.commitTransaction();
+    res.json({ success: true, message: 'Booking postponed successfully', booking });
+  } catch (error) {
+    await session.abortTransaction();
+    next(error);
+  } finally {
+    session.endSession();
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -435,4 +562,6 @@ module.exports = {
   updateBookingStatus,
   acceptBooking,
   rejectBooking,
+  cancelBooking,
+  postponeBooking,
 };

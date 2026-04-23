@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provider Side - HelpLender Booking Flow</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 2vh 2vw;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin: 0 0 10px 0;
+            font-size: 1.5rem;
+        }
+        .mermaid {
+            background-color: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            height: calc(100vh - 80px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .mermaid svg {
+            max-width: 600% !important;
+            max-height: 50% !important;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Provider Side - HelpLender Booking Flow</h1>
+
+    <div class="mermaid">
+        flowchart TD
+            Start([Start]) --> App["Submit 'Become a Helper' Application"]
+            App --> Wait["Status: PENDING (Wait for Admin Review)"]
+            
+            Wait --> Admin{"Admin Approves?"}
+            
+            Admin -- Reject --> RejSMS["Receive Rejection SMS"]
+            RejSMS --> S1([Stop])
+            
+            Admin -- Approve --> AppSMS["Receive Approval SMS with Temp Password"]
+            AppSMS --> Login["Login with Temporary Password"]
+            Login --> ResetGuard["System Forces Password Reset (First Login Guard)"]
+            ResetGuard --> SetPass["Set New Password & Access Provider Dashboard"]
+            
+            SetPass --> Online["Toggle Status to 'ONLINE'"]
+            Online --> WaitJob["Wait for new Job Assignments"]
+            
+            WaitJob --> Notif["Receive Push Notification / SMS for New Job"]
+            
+            Notif --> Accept{"Accept Job Request?"}
+            
+            Accept -- Reject --> RouteNext["System routes job to next Provider"]
+            RouteNext --> S2([End])
+            
+            Accept -- Accept --> Confirmed["Job Status: CONFIRMED"]
+            Confirmed --> Travel["Click 'Start Travel' button"]
+            Travel --> Broadcast["Activate GPS & Broadcast Location via WebSockets"]
+            Broadcast --> Arrived["Click 'Arrived' button at Customer Address"]
+            Arrived --> GPSStop["GPS Tracking Stops"]
+            GPSStop --> StartJob["Click 'Start Job' button"]
+            StartJob --> InProgress["Job Executed (Status: IN_PROGRESS)"]
+            InProgress --> CompleteBtn["Click 'Complete Job' button"]
+            CompleteBtn --> Completed["Job Status: COMPLETED"]
+            Completed --> Calc["Server Calculates 80% Payout & 20% Admin Commission"]
+            Calc --> Wallet["Earnings Deposited into Provider Digital Wallet"]
+            Wallet --> StopFinal([Stop])
+            
+            %% Styling to match the PlantUML theme requested (Green and Yellow)
+            classDef default fill:#E8F5E9,stroke:#4CAF50,stroke-width:2px,color:#000;
+            classDef decision fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#000;
+            classDef terminal fill:#333,stroke:#333,stroke-width:2px,color:#fff;
+            
+            class Admin,Accept decision;
+            class Start,S1,S2,StopFinal terminal;
+    </div>
+
+</body>
+</html>

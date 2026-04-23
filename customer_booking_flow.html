@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Side - HelpLender Booking Flow</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 2vh 2vw;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin: 0 0 5px 0;
+            font-size: 1rem;
+        }
+        .mermaid {
+            background-color: white;
+            padding: 5px;
+            border-radius: 1px;
+            box-shadow: 0 4px 3px rgba(0,0,0,0.1);
+            width: 100%;
+            height: calc(100vh - 80px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .mermaid svg {
+            max-width: 150% !important;
+            max-height: 90% !important;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Customer Side - HelpLender Booking Flow</h1>
+
+    <div class="mermaid">
+        flowchart TD
+            Start([Start]) --> V[Visit HelpLender Homepage]
+            
+            V --> L{Is Logged In?}
+            L -- No --> R[Login / Register Account]
+            R --> B[Browse Service Categories]
+            L -- Yes --> B
+            
+            B --> S[Select a Specific Service]
+            
+            S --> I{Immediate Booking\nRequired?}
+            I -- Yes --> Val[Validate 3-hour lead time]
+            I -- No --> D[Select specific future Date & Time]
+            
+            Val --> E[Enter & Confirm Service Address]
+            D --> E
+            
+            E --> P{Select Payment Method}
+            P -- Pay via Card --> C[Process payment via Stripe Gateway]
+            P -- Cash On Delivery --> COD[Confirm COD Payment]
+            
+            C --> G[Generate Booking Record\nStatus: PENDING]
+            COD --> G
+            
+            G --> SMS[Receive Booking Confirmation SMS]
+            SMS --> W[Wait for Provider to Accept Job]
+            
+            W --> T{Provider starts travel?}
+            T -- Yes --> M[Open Live GPS Tracking Map]
+            T -- Waiting --> Exec[Service Executed\nStatus: IN_PROGRESS]
+            M --> Exec
+            
+            Exec --> F[Job Finished\nStatus: COMPLETED]
+            F --> Rating[Customer Submits Rating & Review]
+            Rating --> Stop([Stop])
+            
+            %% Styling to match the PlantUML theme requested
+            classDef default fill:#E3F2FD,stroke:#1E88E5,stroke-width:2px,color:#000;
+            classDef decision fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#000;
+            classDef terminal fill:#333,stroke:#333,stroke-width:2px,color:#fff;
+            
+            class L,I,P,T decision;
+            class Start,Stop terminal;
+    </div>
+
+</body>
+</html>
